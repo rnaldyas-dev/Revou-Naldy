@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tes Pet Counter — Kiro Cat Clicker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      padding: 2rem;
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 1rem; color: #f9a8c9; }
+    #summary {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      padding: 0.6rem 1rem;
+      border-radius: 0.5rem;
+      display: inline-block;
+    }
+    .pass-bg { background: rgba(40, 200, 100, 0.18); color: #4ade80; }
+    .fail-bg { background: rgba(220, 60, 60, 0.18); color: #f87171; }
+    #results { margin-top: 0.5rem; }
+    .test-item {
+      padding: 0.5rem 0.8rem;
+      margin: 0.3rem 0;
+      border-radius: 0.4rem;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    .test-pass { background: rgba(40, 200, 100, 0.08); border-left: 3px solid #4ade80; }
+    .test-fail { background: rgba(220, 60, 60, 0.08); border-left: 3px solid #f87171; }
+    .badge { font-weight: 700; flex-shrink: 0; }
+    .badge-pass { color: #4ade80; }
+    .badge-fail { color: #f87171; }
+    .test-detail { color: #aaa; font-size: 0.82rem; margin-top: 0.2rem; }
+    #iframe-container { display: none; }
+  </style>
+</head>
+<body>
+  <h1>🐾 Tes Pet Counter — Kiro Cat Petting Clicker</h1>
+  <div id="summary">⏳ Menjalankan tes...</div>
+  <div id="results"></div>
+
+  <!-- iframe tersembunyi untuk load index.html -->
+  <div id="iframe-container">
+    <iframe id="app-frame" src="index.html" title="App under test"></iframe>
+  </div>
+
+  <script src="tes-petcounter.js"></script>
+</body>
+</html>

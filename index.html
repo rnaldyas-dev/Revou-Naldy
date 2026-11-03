@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kiro — Cute Cat Petting Clicker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ─── Reset & root ─── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --pink:    #FFDEED;
+      --aqua:    #B5FFFC;
+      --lavender:#DDD0FF;
+      --peach:   #FFD6B0;
+      --cream:   #FFFBF5;
+      --text-main: #7b5ea7;
+      --text-soft: #b38fd1;
+      --glass-bg:     rgba(255,255,255,0.38);
+      --glass-border: rgba(255,255,255,0.72);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Quicksand', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      background: linear-gradient(145deg, #FFDEED 0%, #f8d6f8 25%, #d6e8ff 55%, #B5FFFC 100%);
+      background-attachment: fixed;
+    }
+
+    /* ─── Floating bg canvas ─── */
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ─── Glassmorphism ─── */
+    .glass {
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1.5px solid var(--glass-border);
+      border-radius: 2rem;
+      box-shadow:
+        0 8px 40px rgba(180,130,220,0.18),
+        0 2px 0 rgba(255,255,255,0.8) inset,
+        0 -1px 0 rgba(200,160,230,0.15) inset;
+    }
+
+    .glass-sm {
+      background: rgba(255,255,255,0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1.5px solid rgba(255,255,255,0.75);
+      border-radius: 1.25rem;
+      box-shadow: 0 4px 18px rgba(180,130,220,0.14);
+    }
+
+    /* ─── Cat stage ─── */
+    #cat-stage {
+      position: relative;
+      width: 240px;
+      height: 260px;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      outline: none;
+    }
+
+    #cat-stage:focus-visible {
+      outline: 3px solid rgba(180,130,220,0.5);
+      outline-offset: 6px;
+      border-radius: 50%;
+    }
+
+    #cat-svg {
+      width: 100%;
+      height: 100%;
+      transition: filter 0.3s;
+      filter: drop-shadow(0 10px 24px rgba(150,100,190,0.22));
+      will-change: transform;
+    }
+
+    /* ─── Cat tail animation ─── */
+    #cat-tail {
+      transform-origin: 108px 215px;
+      animation: tailWag 2.6s ease-in-out infinite;
+    }
+    @keyframes tailWag {
+      0%,100% { transform: rotate(-14deg); }
+      50%      { transform: rotate(16deg); }
+    }
+
+    /* ─── Ear twitch ─── */
+    .ear-twitch-l { animation: earTwitchL 0.36s ease-in-out 2; }
+    .ear-twitch-r { animation: earTwitchR 0.36s ease-in-out 2; }
+    @keyframes earTwitchL {
+      0%,100% { transform: rotate(0deg); }
+      50%      { transform: rotate(-18deg); }
+    }
+    @keyframes earTwitchR {
+      0%,100% { transform: rotate(0deg); }
+      50%      { transform: rotate(18deg); }
+    }
+
+    /* ─── Cat click bounce ─── */
+    .cat-bounce { animation: catBounce 0.38s cubic-bezier(.36,1.6,.64,1); }
+    @keyframes catBounce {
+      0%,100% { transform: translateY(0) scale(1); }
+      40%      { transform: translateY(-14px) scale(1.05,0.95); }
+      70%      { transform: translateY(4px) scale(0.97,1.03); }
+    }
+
+    /* ─── Shake (grumpy) ─── */
+    .cat-shake { animation: catShake 0.45s ease; }
+    @keyframes catShake {
+      0%,100%{ transform: translateX(0) rotate(0); }
+      15%    { transform: translateX(-10px) rotate(-4deg); }
+      35%    { transform: translateX(10px) rotate(4deg); }
+      55%    { transform: translateX(-6px) rotate(-2deg); }
+      75%    { transform: translateX(6px) rotate(2deg); }
+    }
+
+    /* ─── Zoomies spin ─── */
+    .cat-zoom { animation: catZoom 0.55s cubic-bezier(.36,1.4,.64,1); }
+    @keyframes catZoom {
+      0%   { transform: rotate(0deg) scale(1); }
+      50%  { transform: rotate(180deg) scale(1.14,0.9); }
+      100% { transform: rotate(360deg) scale(1); }
+    }
+
+    /* ─── Blush circles ─── */
+    #blush-l, #blush-r {
+      opacity: 0;
+      transition: opacity 0.35s;
+    }
+    .show-blush #blush-l,
+    .show-blush #blush-r { opacity: 0.8; }
+
+    /* ─── Heart floater ─── */
+    #heart-el {
+      opacity: 0;
+      transform: translateY(0) scale(0.4);
+      transition: opacity 0.25s, transform 0.35s cubic-bezier(.34,1.6,.64,1);
+    }
+    .show-heart #heart-el {
+      opacity: 1;
+      transform: translateY(-20px) scale(1);
+    }
+
+    /* ─── Zzz floater ─── */
+    #zzz-el {
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+    .show-zzz #zzz-el {
+      opacity: 1;
+      animation: zzzDrift 2s ease-in-out infinite;
+    }
+    @keyframes zzzDrift {
+      0%,100% { transform: translate(0,0) rotate(0deg); }
+      50%      { transform: translate(5px,-8px) rotate(5deg); }
+    }
+
+    /* ─── Sparkle burst (milestone) ─── */
+    #sparkle-burst {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .show-sparkle #sparkle-burst {
+      animation: sparklePop 0.9s ease-out forwards;
+    }
+    @keyframes sparklePop {
+      0%   { opacity: 1; transform: scale(0.5) rotate(0deg); }
+      70%  { opacity: 1; transform: scale(1.7) rotate(200deg); }
+      100% { opacity: 0; transform: scale(2.2) rotate(280deg); }
+    }
+
+    /* ─── Angry puffs ─── */
+    #angry-el {
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .show-angry #angry-el { opacity: 1; }
+
+    /* ─── Sweat drop (surprised) ─── */
+    #sweat-el {
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .show-sweat #sweat-el { opacity: 1; }
+
+    /* ─── Stars floater (zoomies) ─── */
+    #stars-el {
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .show-stars #stars-el {
+      opacity: 1;
+      animation: starsOrbit 0.8s linear infinite;
+    }
+    @keyframes starsOrbit {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* ─── Reaction bubble ─── */
+    #reaction-bubble {
+      position: absolute;
+      top: -58px;
+      left: 50%;
+      transform: translateX(-50%) scale(0.6);
+      opacity: 0;
+      transition: transform 0.28s cubic-bezier(.34,1.6,.64,1), opacity 0.2s;
+      pointer-events: none;
+      z-index: 30;
+      white-space: nowrap;
+    }
+    #reaction-bubble.visible {
+      transform: translateX(-50%) scale(1);
+      opacity: 1;
+    }
+    .bubble-inner {
+      background: rgba(255,255,255,0.72);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1.5px solid rgba(255,255,255,0.85);
+      border-radius: 1.4rem;
+      padding: 7px 18px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-main);
+      box-shadow: 0 4px 16px rgba(180,130,220,0.18);
+    }
+    .bubble-inner::after {
+      content: '';
+      position: absolute;
+      bottom: -8px;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: rgba(255,255,255,0.85);
+    }
+    .bubble-inner { position: relative; }
+
+    /* ─── Pet counter ─── */
+    #pet-count {
+      font-size: 4rem;
+      font-weight: 700;
+      line-height: 1;
+      background: linear-gradient(135deg, #f9a8c9 0%, #b58ff5 50%, #7ec8e3 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      transition: transform 0.12s;
+    }
+    #pet-count.pop { animation: countPop 0.28s ease-out; }
+    @keyframes countPop {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.28); }
+      100% { transform: scale(1); }
+    }
+
+    /* ─── Milestone badges ─── */
+    .milestone-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 14px;
+      border-radius: 1rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      transition: all 0.35s cubic-bezier(.34,1.6,.64,1);
+    }
+    .badge-locked {
+      background: rgba(210,195,240,0.22);
+      border: 1.5px dashed rgba(180,155,220,0.35);
+      color: #c0aee0;
+    }
+    .badge-unlocked {
+      background: linear-gradient(135deg, rgba(255,220,240,0.85), rgba(225,210,255,0.85));
+      border: 1.5px solid rgba(255,255,255,0.8);
+      color: #7b5ea7;
+      box-shadow: 0 2px 12px rgba(200,160,240,0.25);
+      animation: badgePop 0.5s cubic-bezier(.34,1.6,.64,1);
+    }
+    @keyframes badgePop {
+      0%   { transform: scale(0.8); }
+      60%  { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    /* ─── Progress bar ─── */
+    .progress-track {
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(210,190,240,0.28);
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #f9a8c9, #b58ff5, #7ec8e3);
+      background-size: 200% 100%;
+      animation: gradientShift 3s linear infinite;
+      transition: width 0.4s ease;
+    }
+    @keyframes gradientShift {
+      0%   { background-position: 0% 50%; }
+      100% { background-position: 200% 50%; }
+    }
+
+    /* ─── Milestone toast ─── */
+    #milestone-toast {
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%) translateY(120px);
+      opacity: 0;
+      z-index: 200;
+      transition: transform 0.45s cubic-bezier(.34,1.5,.64,1), opacity 0.35s;
+      pointer-events: none;
+    }
+    #milestone-toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    /* ─── Particle canvas ─── */
+    #particle-canvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    /* ─── Reaction log ─── */
+    #reaction-log {
+      max-height: 138px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(190,160,230,0.35) transparent;
+    }
+    #reaction-log::-webkit-scrollbar { width: 4px; }
+    #reaction-log::-webkit-scrollbar-thumb {
+      background: rgba(190,160,230,0.35);
+      border-radius: 4px;
+    }
+    .log-entry { animation: logIn 0.3s ease-out; }
+    @keyframes logIn {
+      from { opacity:0; transform: translateX(-8px); }
+      to   { opacity:1; transform: translateX(0); }
+    }
+
+    /* ─── Paw stamp ─── */
+    .paw-stamp {
+      position: fixed;
+      pointer-events: none;
+      z-index: 100;
+      font-size: 1.4rem;
+      animation: pawStamp 0.75s ease-out forwards;
+    }
+    @keyframes pawStamp {
+      0%   { opacity:1; transform: scale(0.5) rotate(-20deg); }
+      50%  { opacity:1; transform: scale(1.2) rotate(8deg); }
+      100% { opacity:0; transform: scale(0.9) rotate(0deg) translateY(-22px); }
+    }
+
+    /* ─── Sound btn ─── */
+    #sound-btn {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 150;
+      width: 44px;
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.25rem;
+      background: rgba(255,255,255,0.55);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1.5px solid rgba(255,255,255,0.8);
+      border-radius: 50%;
+      box-shadow: 0 4px 14px rgba(180,130,220,0.18);
+      cursor: pointer;
+      transition: transform 0.18s, background 0.2s;
+    }
+    #sound-btn:hover  { transform: scale(1.1); background: rgba(255,255,255,0.75); }
+    #sound-btn:active { transform: scale(0.94); }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 480px) {
+      #cat-stage { width: 200px; height: 216px; }
+      #pet-count { font-size: 3.2rem; }
+    }
+  </style>
+</head>
+
+<body class="relative flex flex-col items-center justify-start min-h-screen py-8 px-4">
+
+  <!-- ── Background canvas (stars, clouds, sparkles, glows) ── -->
+  <canvas id="bg-canvas"></canvas>
+
+  <!-- ── Particle canvas (click effects) ── -->
+  <canvas id="particle-canvas"></canvas>
+
+  <!-- ── Sound Toggle ── -->
+  <button id="sound-btn" aria-label="Toggle sound" title="Sound is OFF">🔇</button>
+
+  <!-- ══════════════════════════════════════════════════
+       MAIN CARD
+  ══════════════════════════════════════════════════ -->
+  <main class="glass relative z-10 w-full max-w-[440px] p-7 sm:p-9 flex flex-col gap-7 my-4">
+
+    <!-- Header -->
+    <header class="text-center select-none">
+      <h1 class="text-2xl sm:text-[1.65rem] font-bold text-[#7b5ea7] tracking-wide leading-snug drop-shadow-sm">
+        🐾 Kiro — Cute Cat Petting Clicker
+      </h1>
+      <p class="text-sm text-[#b38fd1] mt-1.5 font-semibold">
+        Click Kiro to show some love! ♡
+      </p>
+    </header>
+
+    <!-- Cat + counter section -->
+    <section class="flex flex-col items-center gap-5">
+
+      <!-- Cat Stage -->
+      <div id="cat-stage" role="button" tabindex="0" aria-label="Pet Kiro the cat">
+
+        <!-- Reaction bubble -->
+        <div id="reaction-bubble" aria-live="polite">
+          <div class="bubble-inner"></div>
+        </div>
+
+        <!-- ─────────────────────────────────
+             CAT SVG
+        ───────────────────────────────── -->
+        <svg id="cat-svg" viewBox="0 0 240 260" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <!-- Body gradient -->
+            <radialGradient id="gBody" cx="50%" cy="38%" r="62%">
+              <stop offset="0%"   stop-color="#fde3d5"/>
+              <stop offset="100%" stop-color="#f0b89a"/>
+            </radialGradient>
+            <!-- Belly gradient -->
+            <radialGradient id="gBelly" cx="50%" cy="45%" r="55%">
+              <stop offset="0%"   stop-color="#fff9f6"/>
+              <stop offset="100%" stop-color="#fde3d5"/>
+            </radialGradient>
+            <!-- Inner ear gradient -->
+            <radialGradient id="gEar" cx="50%" cy="50%" r="50%">
+              <stop offset="0%"   stop-color="#ffbdd6"/>
+              <stop offset="100%" stop-color="#f897b8"/>
+            </radialGradient>
+            <!-- Soft drop shadow -->
+            <filter id="fShadow" x="-15%" y="-15%" width="130%" height="130%">
+              <feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#c093d8" flood-opacity="0.22"/>
+            </filter>
+            <!-- Glow for milestones -->
+            <filter id="fGlow">
+              <feGaussianBlur stdDeviation="4" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <!-- ── Sparkle burst (milestone) ── -->
+          <g id="sparkle-burst" transform-origin="120 130">
+            <text x="120" y="22" text-anchor="middle" font-size="18">✨</text>
+            <text x="28"  y="90" text-anchor="middle" font-size="15">💫</text>
+            <text x="212" y="90" text-anchor="middle" font-size="15">💫</text>
+            <text x="55"  y="25" text-anchor="middle" font-size="13">⭐</text>
+            <text x="185" y="25" text-anchor="middle" font-size="13">⭐</text>
+            <text x="22"  y="150" text-anchor="middle" font-size="12">🌟</text>
+            <text x="218" y="150" text-anchor="middle" font-size="12">🌟</text>
+          </g>
+
+          <!-- ── Tail ── -->
+          <g id="cat-tail">
+            <path d="M 95 225 Q 42 248 28 212 Q 14 176 52 166 Q 70 162 82 178"
+                  fill="none" stroke="#f0b89a" stroke-width="16"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M 95 225 Q 42 248 28 212 Q 14 176 52 166 Q 70 162 82 178"
+                  fill="none" stroke="#fde3d5" stroke-width="8"
+                  stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+          </g>
+
+          <!-- ── Body ── -->
+          <g id="cat-body-group" filter="url(#fShadow)">
+            <ellipse cx="120" cy="185" rx="68" ry="60" fill="url(#gBody)"/>
+            <!-- belly -->
+            <ellipse cx="120" cy="193" rx="36" ry="32" fill="url(#gBelly)" opacity="0.92"/>
+            <!-- tabby stripe hints -->
+            <path d="M 80 157 Q 86 148 92 157" fill="none" stroke="#e0a080" stroke-width="2.2" stroke-linecap="round" opacity="0.55"/>
+            <path d="M 148 157 Q 154 148 160 157" fill="none" stroke="#e0a080" stroke-width="2.2" stroke-linecap="round" opacity="0.55"/>
+          </g>
+
+          <!-- ── Left ear ── -->
+          <g id="ear-l" style="transform-origin: 72px 72px;">
+            <polygon points="62,76 44,30 94,60" fill="url(#gBody)"/>
+            <polygon points="67,72 56,42 88,62" fill="url(#gEar)" opacity="0.85"/>
+          </g>
+
+          <!-- ── Right ear ── -->
+          <g id="ear-r" style="transform-origin: 168px 72px;">
+            <polygon points="178,76 196,30 146,60" fill="url(#gBody)"/>
+            <polygon points="173,72 184,42 152,62" fill="url(#gEar)" opacity="0.85"/>
+          </g>
+
+          <!-- ── Head ── -->
+          <ellipse cx="120" cy="108" rx="62" ry="58" fill="url(#gBody)" filter="url(#fShadow)"/>
+
+          <!-- forehead M-stripe -->
+          <path d="M 108 68 Q 114 59 120 68 Q 126 59 132 68" fill="none" stroke="#e0a080" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+
+          <!-- ── Blush circles ── -->
+          <ellipse id="blush-l" cx="78"  cy="120" rx="16" ry="9"  fill="#f9a8c9" opacity="0"/>
+          <ellipse id="blush-r" cx="162" cy="120" rx="16" ry="9"  fill="#f9a8c9" opacity="0"/>
+
+          <!-- ── Eyes ── -->
+          <g id="eyes-group">
+            <!-- left eye -->
+            <ellipse id="leye-white" cx="98"  cy="105" rx="13" ry="14" fill="white"/>
+            <ellipse id="leye-pupil" cx="98"  cy="107" rx="8"  ry="9"  fill="#3d2f2a"/>
+            <ellipse id="leye-iris"  cx="98"  cy="107" rx="5"  ry="6"  fill="#6b4e3d" opacity="0.55"/>
+            <circle  id="leye-shine" cx="102" cy="102" r="3"           fill="white"/>
+            <circle                  cx="100" cy="110" r="1.2"         fill="white" opacity="0.5"/>
+            <!-- right eye -->
+            <ellipse id="reye-white" cx="142" cy="105" rx="13" ry="14" fill="white"/>
+            <ellipse id="reye-pupil" cx="142" cy="107" rx="8"  ry="9"  fill="#3d2f2a"/>
+            <ellipse id="reye-iris"  cx="142" cy="107" rx="5"  ry="6"  fill="#6b4e3d" opacity="0.55"/>
+            <circle  id="reye-shine" cx="146" cy="102" r="3"           fill="white"/>
+            <circle                  cx="144" cy="110" r="1.2"         fill="white" opacity="0.5"/>
+          </g>
+
+          <!-- ── Nose ── -->
+          <polygon id="cat-nose" points="120,124 114,118 126,118" fill="#f9a8c9"/>
+
+          <!-- ── Mouth ── -->
+          <path id="cat-mouth" d="M 114,128 Q 120,136 126,128"
+                fill="none" stroke="#e0a080" stroke-width="2.2" stroke-linecap="round"/>
+
+          <!-- ── Whiskers ── -->
+          <g id="whiskers" stroke="#9b8060" stroke-width="1.3" stroke-linecap="round" opacity="0.65">
+            <line x1="58"  y1="118" x2="105" y2="124"/>
+            <line x1="56"  y1="126" x2="103" y2="127"/>
+            <line x1="60"  y1="134" x2="105" y2="130"/>
+            <line x1="182" y1="118" x2="135" y2="124"/>
+            <line x1="184" y1="126" x2="137" y2="127"/>
+            <line x1="180" y1="134" x2="135" y2="130"/>
+          </g>
+
+          <!-- ── Paws ── -->
+          <ellipse cx="88"  cy="232" rx="24" ry="14" fill="url(#gBody)"/>
+          <ellipse cx="152" cy="232" rx="24" ry="14" fill="url(#gBody)"/>
+          <!-- left toe beans -->
+          <ellipse cx="80"  cy="238" rx="6" ry="4.5" fill="#f9a8c9" opacity="0.82"/>
+          <ellipse cx="89"  cy="241" rx="6" ry="4.5" fill="#f9a8c9" opacity="0.82"/>
+          <ellipse cx="98"  cy="238" rx="6" ry="4.5" fill="#f9a8c9" opacity="0.82"/>
+          <!-- right toe beans -->
+          <ellipse cx="143" cy="238" rx="6" ry="4.5" fill="#f9a8c9" opacity="0.82"/>
+          <ellipse cx="152" cy="241" rx="6" ry="4.5" fill="#f9a8c9" opacity="0.82"/>
+          <ellipse cx="161" cy="238" rx="6" ry="4.5" fill="#f9a8c9" opacity="0.82"/>
+
+          <!-- ── Floating elements (reaction state) ── -->
+          <!-- Heart -->
+          <g id="heart-el" transform-origin="120 55">
+            <text x="120" y="58" text-anchor="middle" font-size="26">💕</text>
+          </g>
+          <!-- Zzz -->
+          <g id="zzz-el" transform-origin="175 60">
+            <text x="168" y="68" text-anchor="middle" font-size="14" fill="#c4b0f0" font-family="Quicksand,sans-serif" font-weight="700">z</text>
+            <text x="180" y="52" text-anchor="middle" font-size="18" fill="#c4b0f0" font-family="Quicksand,sans-serif" font-weight="700">z</text>
+            <text x="195" y="34" text-anchor="middle" font-size="23" fill="#c4b0f0" font-family="Quicksand,sans-serif" font-weight="700">Z</text>
+          </g>
+          <!-- Angry puffs -->
+          <g id="angry-el">
+            <text x="78"  y="56" text-anchor="middle" font-size="16">💢</text>
+            <text x="162" y="56" text-anchor="middle" font-size="16">💢</text>
+          </g>
+          <!-- Sweat (surprised) -->
+          <g id="sweat-el">
+            <text x="170" y="72" text-anchor="middle" font-size="18">💦</text>
+          </g>
+          <!-- Stars (zoomies) -->
+          <g id="stars-el" transform-origin="120 108">
+            <text x="60"  y="68"  text-anchor="middle" font-size="14">⭐</text>
+            <text x="180" y="68"  text-anchor="middle" font-size="14">⭐</text>
+            <text x="120" y="44"  text-anchor="middle" font-size="16">✨</text>
+          </g>
+        </svg>
+        <!-- end cat-svg -->
+
+      </div>
+      <!-- end cat-stage -->
+
+      <!-- Counter -->
+      <div class="text-center select-none">
+        <p class="text-[11px] font-bold text-[#c4aae8] uppercase tracking-[0.2em] mb-1">Total Pets</p>
+        <div id="pet-count" aria-live="polite" aria-label="Pet count">0</div>
+        <p id="reaction-name" class="text-sm font-bold text-[#b38fd1] mt-1.5 transition-colors duration-300">
+          — waiting for love —
+        </p>
+      </div>
+
+      <!-- Progress to next milestone -->
+      <div class="w-full select-none">
+        <div class="flex justify-between text-[11px] font-bold text-[#c4aae8] mb-1.5">
+          <span>Next milestone</span>
+          <span id="progress-label">0 / 10</span>
+        </div>
+        <div class="progress-track w-full">
+          <div id="progress-fill" class="progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Milestones -->
+    <section>
+      <h2 class="text-[11px] font-bold text-[#c4aae8] uppercase tracking-[0.18em] mb-3 select-none">
+        Milestones
+      </h2>
+      <div id="milestones-grid" class="grid grid-cols-2 gap-2.5"></div>
+    </section>
+
+    <!-- Reaction Log -->
+    <section>
+      <h2 class="text-[11px] font-bold text-[#c4aae8] uppercase tracking-[0.18em] mb-2.5 select-none">
+        Recent Reactions
+      </h2>
+      <div id="reaction-log" class="flex flex-col gap-1.5">
+        <p class="text-xs text-[#c4aae8] italic opacity-70">Pet Kiro to see reactions here…</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Milestone toast -->
+  <div id="milestone-toast" role="status" aria-live="assertive" aria-atomic="true">
+    <div class="glass px-7 py-5 text-center shadow-2xl">
+      <div id="toast-emoji" class="text-4xl mb-1.5">🎉</div>
+      <div id="toast-title" class="text-lg font-bold text-[#7b5ea7]">Milestone!</div>
+      <div id="toast-desc"  class="text-sm font-semibold text-[#b38fd1] mt-0.5"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       JAVASCRIPT
+  ═══════════════════════════════════════ -->
+  <script>
+  (() => {
+    'use strict';
+
+    /* ══════════════════════════════
+       STATE
+    ══════════════════════════════ */
+    let petCount = 0;
+    let soundOn  = false;   // disabled by default
+    let audioCtx = null;
+    let bubbleTimer = null;
+    let toastTimer  = null;
+    let milestoneFlags = [false, false, false, false];
+
+    /* ══════════════════════════════
+       DOM REFS
+    ══════════════════════════════ */
+    const $ = id => document.getElementById(id);
+
+    const catStage     = $('cat-stage');
+    const catSVG       = $('cat-svg');
+    const earL         = $('ear-l');
+    const earR         = $('ear-r');
+    const catBodyGroup = $('cat-body-group');
+
+    // Eyes
+    const leyeWhite = $('leye-white');
+    const leyePupil = $('leye-pupil');
+    const leyeIris  = $('leye-iris');
+    const leyeShine = $('leye-shine');
+    const reyeWhite = $('reye-white');
+    const reyePupil = $('reye-pupil');
+    const reyeIris  = $('reye-iris');
+    const reyeShine = $('reye-shine');
+
+    const catMouth  = $('cat-mouth');
+    const blushL    = $('blush-l');
+    const blushR    = $('blush-r');
+
+    const reactionBubble = $('reaction-bubble');
+    const bubbleInner    = reactionBubble.querySelector('.bubble-inner');
+    const petCountEl     = $('pet-count');
+    const reactionName   = $('reaction-name');
+    const progressFill   = $('progress-fill');
+    const progressLabel  = $('progress-label');
+    const milesGrid      = $('milestones-grid');
+    const reactionLog    = $('reaction-log');
+    const soundBtn       = $('sound-btn');
+    const toast          = $('milestone-toast');
+    const toastEmoji     = $('toast-emoji');
+    const toastTitle     = $('toast-title');
+    const toastDesc      = $('toast-desc');
+    const particleCanvas = $('particle-canvas');
+    const pCtx           = particleCanvas.getContext('2d');
+    const bgCanvas       = $('bg-canvas');
+    const bgCtx          = bgCanvas.getContext('2d');
+
+    /* ══════════════════════════════
+       MILESTONES
+    ══════════════════════════════ */
+    const MILESTONES = [
+      { at: 10,  emoji: '🌸', title: 'First Pets!',    desc: '10 pets — Kiro is warming up to you!',       color: '#f9a8c9' },
+      { at: 25,  emoji: '💜', title: 'Bonded!',        desc: '25 pets — Kiro really likes you!',           color: '#b58ff5' },
+      { at: 50,  emoji: '🌟', title: 'Best Friends!',  desc: '50 pets — you two are inseparable!',         color: '#ffd966' },
+      { at: 100, emoji: '👑', title: 'Cat Royalty!',   desc: '100 pets — you are the chosen human! 🎉',   color: '#ffc97a' },
+    ];
+
+    /* ══════════════════════════════
+       REACTIONS
+    ══════════════════════════════ */
+    const REACTIONS = [
+      {
+        id: 'happy',
+        name: 'Happy',    emoji: '😸',
+        bubble: '( ´ ▽ ` )ﾉ  Purr~',
+        color: '#f9d06a',
+        weight: 22,
+        apply() {
+          resetFace();
+          // big round eyes
+          setEyes({ ry: 14, pupilRy: 9 });
+          // big smile
+          catMouth.setAttribute('d', 'M 112,128 Q 120,138 128,128');
+          catSVG.classList.add('show-heart');
+          bounceBody();
+          twitchEars();
+        },
+      },
+      {
+        id: 'purring',
+        name: 'Purring',  emoji: '😻',
+        bubble: 'Prrrr ♡♡♡',
+        color: '#f9a8c9',
+        weight: 18,
+        apply() {
+          resetFace();
+          // squinty happy eyes
+          setEyes({ eyeRy: 7, pupilRy: 5 });
+          catSVG.classList.add('show-blush','show-heart');
+          catMouth.setAttribute('d', 'M 113,128 Q 120,136 127,128');
+        },
+      },
+      {
+        id: 'blushing',
+        name: 'Blushing',  emoji: '🥰',
+        bubble: '(〃´∀｀〃)  *blush*',
+        color: '#ff8fab',
+        weight: 16,
+        apply() {
+          resetFace();
+          catSVG.classList.add('show-blush','show-heart');
+          // wide dilated pupils
+          setEyes({ pupilRx: 9, pupilRy: 10 });
+          catMouth.setAttribute('d', 'M 111,128 Q 120,139 129,128');
+          bounceBody();
+        },
+      },
+      {
+        id: 'surprised',
+        name: 'Surprised',  emoji: '😲',
+        bubble: '(°ロ°)  !!',
+        color: '#7ec8e3',
+        weight: 12,
+        apply() {
+          resetFace();
+          // huge eyes, O mouth
+          setEyes({ eyeRy: 16, pupilRy: 12 });
+          catMouth.setAttribute('d', 'M 115,130 Q 120,125 125,130');
+          catSVG.classList.add('show-sweat');
+          twitchEars();
+        },
+      },
+      {
+        id: 'sleepy',
+        name: 'Sleepy',  emoji: '😴',
+        bubble: 'Zzz… zzz…',
+        color: '#c4b0f0',
+        weight: 8,
+        apply() {
+          resetFace();
+          // half-closed droopy eyes
+          setEyes({ eyeRy: 5, pupilRy: 3, pupilCy: 110 });
+          catSVG.classList.add('show-zzz');
+          catMouth.setAttribute('d', 'M 115,129 Q 120,132 125,129');
+        },
+      },
+      {
+        id: 'zoomies',
+        name: 'Zoomies',  emoji: '💨',
+        bubble: 'ZOOOOM!! ₍₍ ◝(°∀°)◜ ₎₎',
+        color: '#8fe0d4',
+        weight: 14,
+        apply() {
+          resetFace();
+          // wide horizontal pupils (excited)
+          setEyes({ eyeRy: 16, pupilRy: 5 });
+          catSVG.classList.add('show-stars');
+          catMouth.setAttribute('d', 'M 111,127 Q 120,138 129,127');
+          zoomBody();
+          twitchEars();
+        },
+      },
+      {
+        id: 'playful',
+        name: 'Playful',  emoji: '🐾',
+        bubble: '(=^•ω•^=)  Play?',
+        color: '#ffb76b',
+        weight: 16,
+        apply() {
+          resetFace();
+          // wink left eye
+          leyeWhite.setAttribute('ry', '2.5');
+          leyePupil.setAttribute('ry', '1.5');
+          leyeIris.setAttribute('ry', '1');
+          leyeShine.setAttribute('opacity', '0');
+          catMouth.setAttribute('d', 'M 111,127 Q 120,139 129,127');
+          catSVG.classList.add('show-heart');
+          bounceBody();
+        },
+      },
+      {
+        id: 'grumpy',
+        name: 'Grumpy',  emoji: '😾',
+        bubble: '(ꐦ°᷄д°᷅)  Hmph!!',
+        color: '#e0846a',
+        weight: 5,
+        apply() {
+          resetFace();
+          // slitted narrowed eyes
+          setEyes({ eyeRy: 7, pupilRx: 4, pupilRy: 5 });
+          leyePupil.setAttribute('fill', '#1e1410');
+          reyePupil.setAttribute('fill', '#1e1410');
+          // frown
+          catMouth.setAttribute('d', 'M 114,132 Q 120,126 126,132');
+          catSVG.classList.add('show-angry');
+          shakeBody();
+        },
+      },
+    ];
+
+    /* ── Helper: set eye sizes ── */
+    function setEyes({ eyeRy, pupilRx, pupilRy, pupilCy } = {}) {
+      if (eyeRy   != null) { leyeWhite.setAttribute('ry', eyeRy);   reyeWhite.setAttribute('ry', eyeRy); }
+      if (pupilRx != null) { leyePupil.setAttribute('rx', pupilRx); reyePupil.setAttribute('rx', pupilRx); }
+      if (pupilRy != null) { leyePupil.setAttribute('ry', pupilRy); reyePupil.setAttribute('ry', pupilRy); }
+      if (pupilCy != null) { leyePupil.setAttribute('cy', pupilCy); reyePupil.setAttribute('cy', pupilCy); }
+    }
+
+    /* ── Reset face to default ── */
+    function resetFace() {
+      // eyes
+      leyeWhite.setAttribute('ry', '14'); reyeWhite.setAttribute('ry', '14');
+      leyePupil.setAttribute('rx', '8'); leyePupil.setAttribute('ry', '9');  leyePupil.setAttribute('cy', '107'); leyePupil.setAttribute('fill', '#3d2f2a');
+      reyePupil.setAttribute('rx', '8'); reyePupil.setAttribute('ry', '9');  reyePupil.setAttribute('cy', '107'); reyePupil.setAttribute('fill', '#3d2f2a');
+      leyeIris.setAttribute('ry', '6'); reyeIris.setAttribute('ry', '6');
+      leyeShine.setAttribute('opacity', '1'); reyeShine.setAttribute('opacity', '1');
+      blushL.setAttribute('opacity', '0'); blushR.setAttribute('opacity', '0');
+      // mouth
+      catMouth.setAttribute('d', 'M 114,128 Q 120,136 126,128');
+      // remove all state classes
+      catSVG.classList.remove(
+        'show-blush','show-heart','show-zzz','show-sparkle',
+        'show-angry','show-sweat','show-stars',
+        'cat-bounce','cat-shake','cat-zoom'
+      );
+      // remove animation classes
+      catSVG.classList.remove('cat-bounce','cat-shake','cat-zoom');
+    }
+
+    function bounceBody() {
+      catSVG.classList.remove('cat-bounce');
+      void catSVG.offsetWidth;
+      catSVG.classList.add('cat-bounce');
+    }
+    function shakeBody() {
+      catSVG.classList.remove('cat-shake');
+      void catSVG.offsetWidth;
+      catSVG.classList.add('cat-shake');
+    }
+    function zoomBody() {
+      catSVG.classList.remove('cat-zoom');
+      void catSVG.offsetWidth;
+      catSVG.classList.add('cat-zoom');
+    }
+    function twitchEars() {
+      earL.classList.remove('ear-twitch-l');
+      earR.classList.remove('ear-twitch-r');
+      void earL.offsetWidth;
+      earL.classList.add('ear-twitch-l');
+      earR.classList.add('ear-twitch-r');
+    }
+
+    /* ══════════════════════════════
+       PICK REACTION (weighted)
+    ══════════════════════════════ */
+    function pickReaction() {
+      const total = REACTIONS.reduce((s, r) => s + r.weight, 0);
+      let r = Math.random() * total;
+      for (const reaction of REACTIONS) {
+        r -= reaction.weight;
+        if (r <= 0) return reaction;
+      }
+      return REACTIONS[0];
+    }
+
+    /* ══════════════════════════════
+       REACTION BUBBLE
+    ══════════════════════════════ */
+    function showBubble(reaction) {
+      bubbleInner.textContent = reaction.bubble;
+      bubbleInner.style.color = reaction.color;
+      bubbleInner.style.borderColor = reaction.color + '99';
+      reactionBubble.classList.add('visible');
+      clearTimeout(bubbleTimer);
+      bubbleTimer = setTimeout(() => reactionBubble.classList.remove('visible'), 2400);
+    }
+
+    /* ══════════════════════════════
+       REACTION LOG
+    ══════════════════════════════ */
+    function addLogEntry(reaction) {
+      const ph = reactionLog.querySelector('p.italic');
+      if (ph) ph.remove();
+
+      const el = document.createElement('div');
+      el.className = 'log-entry flex items-center gap-2 text-xs font-bold';
+      el.innerHTML = `
+        <span style="color:${reaction.color}" aria-hidden="true">${reaction.emoji}</span>
+        <span class="text-[#7b5ea7]">${reaction.name}</span>
+        <span class="ml-auto text-[#c4aae8]">#${petCount}</span>
+      `;
+      reactionLog.prepend(el);
+      while (reactionLog.children.length > 8) reactionLog.removeChild(reactionLog.lastChild);
+    }
+
+    /* ══════════════════════════════
+       PROGRESS BAR
+    ══════════════════════════════ */
+    function updateProgress() {
+      const nextMilestone = MILESTONES.find(m => m.at > petCount);
+      const prevAt = MILESTONES.filter(m => m.at <= petCount).pop()?.at ?? 0;
+
+      if (nextMilestone) {
+        const pct = ((petCount - prevAt) / (nextMilestone.at - prevAt)) * 100;
+        progressFill.style.width = pct + '%';
+        progressLabel.textContent = `${petCount} / ${nextMilestone.at}`;
+      } else {
+        progressFill.style.width = '100%';
+        progressLabel.textContent = `${petCount} ✨ MAX`;
+      }
+    }
+
+    /* ══════════════════════════════
+       MILESTONES GRID
+    ══════════════════════════════ */
+    function renderMilestones() {
+      milesGrid.innerHTML = '';
+      MILESTONES.forEach((m) => {
+        const unlocked = petCount >= m.at;
+        const el = document.createElement('div');
+        el.className = `milestone-badge ${unlocked ? 'badge-unlocked' : 'badge-locked'}`;
+        el.setAttribute('title', m.desc);
+        el.setAttribute('aria-label', `${m.title}: ${m.desc}`);
+        el.innerHTML = `
+          <span aria-hidden="true">${unlocked ? m.emoji : '🔒'}</span>
+          <span class="truncate">${m.title}</span>
+          <span class="ml-auto opacity-55 shrink-0">${m.at}🐾</span>
+        `;
+        milesGrid.appendChild(el);
+      });
+    }
+
+    /* ══════════════════════════════
+       MILESTONE TOAST
+    ══════════════════════════════ */
+    function showToast(milestone) {
+      toastEmoji.textContent = milestone.emoji;
+      toastTitle.textContent = milestone.title;
+      toastDesc.textContent  = milestone.desc;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 3800);
+    }
+
+    /* ══════════════════════════════
+       PAW STAMP
+    ══════════════════════════════ */
+    function spawnPawStamp(x, y) {
+      const glyphs = ['🐾', '♡', '✨', '🌸', '💫'];
+      const el = document.createElement('span');
+      el.className = 'paw-stamp';
+      el.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+      el.style.left = (x - 14) + 'px';
+      el.style.top  = (y - 14) + 'px';
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 850);
+    }
+
+    /* ══════════════════════════════
+       PARTICLE SYSTEM
+    ══════════════════════════════ */
+    const particleList = [];
+    const PARTICLE_GLYPHS = ['💕','✨','⭐','🌸','💫','🌟','♡'];
+
+    function resizeParticleCanvas() {
+      particleCanvas.width  = window.innerWidth;
+      particleCanvas.height = window.innerHeight;
+    }
+    resizeParticleCanvas();
+    window.addEventListener('resize', resizeParticleCanvas);
+
+    function spawnParticles(x, y, count = 14) {
+      for (let i = 0; i < count; i++) {
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 1.2;
+        const speed = 1.8 + Math.random() * 4.2;
+        particleList.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 1.5,
+          alpha: 1,
+          size: 10 + Math.random() * 12,
+          glyph: PARTICLE_GLYPHS[Math.floor(Math.random() * PARTICLE_GLYPHS.length)],
+          decay: 0.014 + Math.random() * 0.016,
+          gravity: 0.07,
+        });
+      }
+    }
+
+    function animateParticles() {
+      pCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+      for (let i = particleList.length - 1; i >= 0; i--) {
+        const p = particleList[i];
+        pCtx.save();
+        pCtx.globalAlpha = Math.max(0, p.alpha);
+        pCtx.font = `${p.size}px serif`;
+        pCtx.fillText(p.glyph, p.x, p.y);
+        pCtx.restore();
+        p.x    += p.vx;
+        p.y    += p.vy;
+        p.vy   += p.gravity;
+        p.alpha -= p.decay;
+        if (p.alpha <= 0) particleList.splice(i, 1);
+      }
+      requestAnimationFrame(animateParticles);
+    }
+    animateParticles();
+
+    /* ══════════════════════════════
+       BACKGROUND CANVAS
+       (stars, clouds, sparkles, glowing orbs)
+    ══════════════════════════════ */
+    const bgElements = [];
+
+    function resizeBgCanvas() {
+      bgCanvas.width  = window.innerWidth;
+      bgCanvas.height = window.innerHeight;
+    }
+    resizeBgCanvas();
+    window.addEventListener('resize', () => { resizeBgCanvas(); initBgElements(); });
+
+    function initBgElements() {
+      bgElements.length = 0;
+      const W = bgCanvas.width, H = bgCanvas.height;
+
+      // Glowing soft circles
+      for (let i = 0; i < 6; i++) {
+        bgElements.push({
+          type: 'glow',
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r: 80 + Math.random() * 160,
+          color: ['rgba(255,210,237,', 'rgba(210,230,255,', 'rgba(181,255,252,', 'rgba(220,210,255,'][i % 4],
+          alpha: 0.12 + Math.random() * 0.12,
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.004 + Math.random() * 0.006,
+          dx: (Math.random() - 0.5) * 0.3,
+          dy: (Math.random() - 0.5) * 0.3,
+        });
+      }
+
+      // Floating stars
+      const STAR_GLYPHS = ['✦','✧','✶','✷','✸','⋆'];
+      for (let i = 0; i < 22; i++) {
+        bgElements.push({
+          type: 'star',
+          x: Math.random() * W,
+          y: Math.random() * H,
+          glyph: STAR_GLYPHS[Math.floor(Math.random() * STAR_GLYPHS.length)],
+          size: 8 + Math.random() * 12,
+          alpha: 0.1 + Math.random() * 0.18,
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.008 + Math.random() * 0.012,
+          dy: -0.12 - Math.random() * 0.16,
+          color: ['#f9a8c9','#b58ff5','#7ec8e3','#ffd966','#a8d8b8'][i % 5],
+        });
+      }
+
+      // Tiny clouds
+      for (let i = 0; i < 4; i++) {
+        bgElements.push({
+          type: 'cloud',
+          x: Math.random() * W,
+          y: 40 + Math.random() * (H * 0.4),
+          w: 80 + Math.random() * 80,
+          h: 30 + Math.random() * 20,
+          alpha: 0.07 + Math.random() * 0.06,
+          dx: 0.18 + Math.random() * 0.18,
+        });
+      }
+
+      // Sparkle emojis
+      for (let i = 0; i < 8; i++) {
+        bgElements.push({
+          type: 'sparkle',
+          x: Math.random() * W,
+          y: Math.random() * H,
+          glyph: ['✨','💫','🌟','⭐'][i % 4],
+          size: 12 + Math.random() * 10,
+          alpha: 0.07 + Math.random() * 0.08,
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.006 + Math.random() * 0.01,
+          dy: -0.1 - Math.random() * 0.12,
+        });
+      }
+    }
+    initBgElements();
+
+    let bgFrame = 0;
+    function animateBg() {
+      bgFrame++;
+      bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      const W = bgCanvas.width, H = bgCanvas.height;
+
+      for (const el of bgElements) {
+        if (el.type === 'glow') {
+          const pulse = 0.85 + 0.15 * Math.sin(bgFrame * el.speed + el.phase);
+          bgCtx.save();
+          const grad = bgCtx.createRadialGradient(el.x, el.y, 0, el.x, el.y, el.r * pulse);
+          grad.addColorStop(0, el.color + (el.alpha * 0.9).toFixed(3) + ')');
+          grad.addColorStop(1, el.color + '0)');
+          bgCtx.fillStyle = grad;
+          bgCtx.beginPath();
+          bgCtx.arc(el.x, el.y, el.r * pulse, 0, Math.PI * 2);
+          bgCtx.fill();
+          bgCtx.restore();
+          el.x += el.dx;
+          el.y += el.dy;
+          if (el.x < -el.r) el.x = W + el.r;
+          if (el.x > W + el.r) el.x = -el.r;
+          if (el.y < -el.r) el.y = H + el.r;
+          if (el.y > H + el.r) el.y = -el.r;
+
+        } else if (el.type === 'star') {
+          const twinkle = 0.5 + 0.5 * Math.sin(bgFrame * el.speed + el.phase);
+          bgCtx.save();
+          bgCtx.globalAlpha = el.alpha * twinkle;
+          bgCtx.fillStyle = el.color;
+          bgCtx.font = `${el.size}px serif`;
+          bgCtx.fillText(el.glyph, el.x, el.y);
+          bgCtx.restore();
+          el.y += el.dy;
+          if (el.y < -20) { el.y = H + 10; el.x = Math.random() * W; }
+
+        } else if (el.type === 'cloud') {
+          bgCtx.save();
+          bgCtx.globalAlpha = el.alpha;
+          bgCtx.fillStyle = 'rgba(255,255,255,1)';
+          // simple cloud: overlapping ellipses
+          const cx = el.x, cy = el.y, w = el.w, h = el.h;
+          bgCtx.beginPath();
+          bgCtx.ellipse(cx,       cy,        w * 0.4, h * 0.75, 0, 0, Math.PI * 2);
+          bgCtx.ellipse(cx + w * 0.32, cy - h * 0.12, w * 0.32, h * 0.62, 0, 0, Math.PI * 2);
+          bgCtx.ellipse(cx - w * 0.28, cy - h * 0.05, w * 0.28, h * 0.55, 0, 0, Math.PI * 2);
+          bgCtx.ellipse(cx + w * 0.55, cy + h * 0.08, w * 0.24, h * 0.48, 0, 0, Math.PI * 2);
+          bgCtx.fill();
+          bgCtx.restore();
+          el.x += el.dx;
+          if (el.x > W + el.w) el.x = -el.w;
+
+        } else if (el.type === 'sparkle') {
+          const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(bgFrame * el.speed + el.phase));
+          bgCtx.save();
+          bgCtx.globalAlpha = el.alpha * twinkle;
+          bgCtx.font = `${el.size}px serif`;
+          bgCtx.fillText(el.glyph, el.x, el.y);
+          bgCtx.restore();
+          el.y += el.dy;
+          if (el.y < -20) { el.y = H + 10; el.x = Math.random() * W; }
+        }
+      }
+
+      requestAnimationFrame(animateBg);
+    }
+    animateBg();
+
+    /* ══════════════════════════════
+       WEB AUDIO API (disabled by default)
+    ══════════════════════════════ */
+    function ensureAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function tone(type, freq, dur, vol = 0.16, detuneVal = 0, delayMs = 0) {
+      if (!soundOn) return;
+      setTimeout(() => {
+        ensureAudio();
+        const osc  = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = type;
+        osc.frequency.value = freq;
+        osc.detune.value = detuneVal;
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+        osc.start();
+        osc.stop(audioCtx.currentTime + dur);
+      }, delayMs);
+    }
+
+    function playReactionSound(id) {
+      if (!soundOn) return;
+      switch (id) {
+        case 'happy':
+          tone('sine', 440, 0.28);
+          tone('sine', 550, 0.28, 0.14, 0, 100);
+          tone('sine', 660, 0.38, 0.12, 0, 200);
+          break;
+        case 'purring':
+          for (let i = 0; i < 5; i++) tone('triangle', 115 + i*8, 0.28, 0.1, 0, i*75);
+          break;
+        case 'blushing':
+          tone('sine', 523, 0.22);
+          tone('sine', 659, 0.22, 0.13, 0, 110);
+          tone('sine', 784, 0.34, 0.11, 0, 220);
+          break;
+        case 'surprised':
+          tone('square', 280, 0.1, 0.13);
+          tone('square', 580, 0.18, 0.1, 0, 70);
+          break;
+        case 'sleepy':
+          tone('sine', 190, 0.65, 0.09);
+          tone('sine', 165, 0.65, 0.07, 0, 320);
+          break;
+        case 'zoomies':
+          for (let i = 0; i < 5; i++) tone('sawtooth', 180 + i*130, 0.14, 0.09, 0, i*55);
+          break;
+        case 'playful':
+          tone('sine', 392, 0.2);
+          tone('sine', 494, 0.2, 0.14, 0, 120);
+          tone('sine', 587, 0.3, 0.11, 0, 240);
+          break;
+        case 'grumpy':
+          tone('sawtooth', 170, 0.3, 0.14);
+          tone('sawtooth', 135, 0.4, 0.11, 0, 160);
+          break;
+      }
+    }
+
+    function playMilestoneSound() {
+      if (!soundOn) return;
+      [523, 659, 784, 1047].forEach((n, i) => tone('sine', n, 0.55, 0.14, 0, i * 115));
+    }
+
+    /* ══════════════════════════════
+       MAIN PET HANDLER
+    ══════════════════════════════ */
+    function onPet(e) {
+      petCount++;
+
+      const reaction = pickReaction();
+
+      // Apply face & animation
+      reaction.apply();
+
+      // Sound
+      playReactionSound(reaction.id);
+
+      // Counter
+      petCountEl.textContent = petCount;
+      petCountEl.classList.remove('pop');
+      void petCountEl.offsetWidth;
+      petCountEl.classList.add('pop');
+
+      // Reaction name label
+      reactionName.textContent = `${reaction.emoji}  ${reaction.name}`;
+      reactionName.style.color = reaction.color;
+
+      // Bubble
+      showBubble(reaction);
+
+      // Particles
+      const rect = catStage.getBoundingClientRect();
+      const px = rect.left + rect.width  / 2;
+      const py = rect.top  + rect.height / 3;
+      spawnParticles(px, py, 13);
+
+      // Paw stamp at cursor
+      const ex = e.clientX ?? px;
+      const ey = e.clientY ?? py;
+      spawnPawStamp(ex, ey);
+
+      // Log
+      addLogEntry(reaction);
+
+      // Progress
+      updateProgress();
+
+      // Milestones
+      MILESTONES.forEach((m, i) => {
+        if (!milestoneFlags[i] && petCount >= m.at) {
+          milestoneFlags[i] = true;
+          catSVG.classList.add('show-sparkle');
+          setTimeout(() => catSVG.classList.remove('show-sparkle'), 1000);
+          spawnParticles(px, py, 35);
+          showToast(m);
+          playMilestoneSound();
+        }
+      });
+
+      renderMilestones();
+    }
+
+    /* ── Keyboard support ── */
+    catStage.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onPet({ clientX: null, clientY: null });
+      }
+    });
+
+    catStage.addEventListener('click', onPet);
+
+    /* ── Touch: prevent 300ms delay ── */
+    catStage.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      const t = e.changedTouches[0];
+      onPet({ clientX: t.clientX, clientY: t.clientY });
+    }, { passive: false });
+
+    /* ── Sound toggle (off by default) ── */
+    soundBtn.addEventListener('click', () => {
+      soundOn = !soundOn;
+      soundBtn.textContent = soundOn ? '🔊' : '🔇';
+      soundBtn.title = soundOn ? 'Mute sound' : 'Unmute sound (currently muted)';
+      soundBtn.setAttribute('aria-label', soundOn ? 'Sound is ON — click to mute' : 'Sound is OFF — click to enable');
+      if (soundOn) ensureAudio(); // pre-warm context on user gesture
+    });
+
+    /* ── Init ── */
+    renderMilestones();
+    updateProgress();
+
+  })();
+  </script>
+</body>
+</html>
